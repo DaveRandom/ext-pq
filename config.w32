@@ -1,0 +1,110 @@
+// $Id$
+// vim:ft=javascript
+
+var pq_loaded_headers = {};
+var pq_include_path, pq_lib_path;
+
+function pq_load_header(file_name)
+{
+	var full_path = pq_include_path + "\\" + file_name;
+
+	if (pq_loaded_headers[full_path] === undefined) {
+		var header = file_get_contents(pq_include_path + "\\" + file_name);
+
+		if (header === false) {
+			ERROR("libpq not found; " + file_name + " not found");
+		}
+
+		pq_loaded_headers[full_path] = header.replace(/\/\/[^\r\n]*$/gm, '').replace(/\/\*(?:(?!\*\/)[\s\S])*\*\//gm, '');
+	}
+
+	return pq_loaded_headers[full_path];
+}
+
+function PQ_GET_PATHS()
+{
+	if (FSO.FileExists(PHP_PQ + "\\include\\libpq-fe.h")
+		&& FSO.FileExists(PHP_PQ + "\\include\\pg_config.h")
+		&& FSO.FileExists(PHP_PQ + "\\lib\\libpq.lib")) {
+
+		pq_include_path = PHP_PQ + "\\include";
+		pq_lib_path = PHP_PQ + "\\lib";
+
+		return true;
+	}
+
+	if (FSO.FileExists(PHP_PHP_BUILD + "\\include\\libpq\\libpq-fe.h")
+		&& FSO.FileExists(PHP_PHP_BUILD + "\\include\\libpq\\pg_config.h")
+		&& FSO.FileExists(PHP_PHP_BUILD + "\\lib\\libpq.lib")) {
+
+		pq_include_path = PHP_PHP_BUILD + "\\include\\libpq";
+		pq_lib_path = PHP_PHP_BUILD + "\\lib";
+
+		return true;
+	}
+
+	return false;
+}
+
+function PQ_GET_VERSION()
+{
+	var config = pq_load_header("pg_config.h");
+	var match = config.match(/^[ \t]*#define\s+PG_VERSION\s+"([^"]+)"[ \t]*$/m);
+
+	if (match === null) {
+		return false;
+	}
+
+	MESSAGE("Found libpq version: " + match[1]);
+	AC_DEFINE("PHP_PQ_LIBVERSION", match[1]);
+
+	return true;
+}
+
+function PQ_CHECK_SYMBOL(symbol, header_file, fail_hard)
+{
+	if (new RegExp("\\b" + symbol + "\\b").test(pq_load_header(header_file || "libpq-fe.h"))) {
+		AC_DEFINE("HAVE_" + symbol.toUpperCase(), 1);
+		return;
+	}
+
+	if (fail_hard) {
+		ERROR("Could not find " + symbol + " in libpq");
+	}
+}
+
+ARG_WITH("pq", "whether to enable libpq (PostgreSQL) support", "no");
+
+if (PHP_PQ != "no") {
+	if (!PQ_GET_PATHS()
+		|| !CHECK_LIB("libpq.lib", "pq", pq_lib_path)
+		|| !CHECK_HEADER_ADD_INCLUDE("libpq-fe.h", "CFLAGS_PQ", pq_include_path)) {
+		ERROR("libpq not found; libraries and headers not found");
+	}
+
+	if (!PQ_GET_VERSION()) {
+		ERROR("libpq not found; unable to find version string");
+	}
+
+	PQ_CHECK_SYMBOL("PGRES_SINGLE_TUPLE");
+	PQ_CHECK_SYMBOL("PGRES_COPY_BOTH");
+
+	PQ_CHECK_SYMBOL("PQregisterEventProc", "libpq-events.h", true);
+	PQ_CHECK_SYMBOL("PQlibVersion");
+	PQ_CHECK_SYMBOL("PQconninfo");
+	PQ_CHECK_SYMBOL("PQsetSingleRowMode");
+
+	EXTENSION("pq", "src\\php_pq_module.c", PHP_PQ_SHARED, "/I" + configure_module_dirname);
+	ADD_SOURCES(
+		configure_module_dirname + '\\src',
+		"php_pq_callback.c php_pq_misc.c php_pq_object.c php_pq_params.c php_pqcancel.c php_pqconn.c php_pqconn_event.c php_pqcopy.c php_pqcur.c php_pqexc.c php_pqlob.c php_pqres.c php_pqstm.c php_pqtxn.c php_pqtypes.c",
+		"pq"
+	);
+
+	if (PHP_RAPHF != "no") {
+		ADD_FLAG("CFLAGS_PQ", get_define("CFLAGS_RAPHF"));
+	}
+
+	ADD_EXTENSION_DEP("pq", "raphf", false);
+	ADD_EXTENSION_DEP("pq", "json", false);
+}
