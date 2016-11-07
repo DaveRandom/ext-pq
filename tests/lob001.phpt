@@ -15,12 +15,14 @@ $lob = $t->createLOB();
 
 var_dump($lob->transaction === $t);
 
-$lob->write(file_get_contents(__FILE__));
-var_dump($lob->tell());
+$data = file_get_contents(__FILE__);
+$length = strlen($data);
+
+$lob->write($data);
+var_dump($lob->tell() === $length);
 
 $lob->seek(0, SEEK_SET);
-$dat = $lob->read(filesize(__FILE__));
-var_dump(md5($dat)===md5_file(__FILE__));
+var_dump(md5($lob->read($length)) === md5($data));
 
 $lob->truncate(5);
 
@@ -35,7 +37,7 @@ DONE
 --EXPECTF--
 Test
 bool(true)
-int(474)
+bool(true)
 bool(true)
 string(5) "%c?php"
 DONE

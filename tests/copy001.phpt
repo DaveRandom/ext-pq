@@ -8,10 +8,15 @@ echo "Test\n";
 
 include "_setup.inc";
 
+function normalize_line($line)
+{
+	return preg_replace('/\r?\n$/', "\n", $line);
+}
+
 $c = new pq\Connection(PQ_DSN);
 $c->exec("DROP TABLE IF EXISTS copy_test; CREATE TABLE copy_test (id serial, line text);");
 
-$file = file(__FILE__);
+$file = array_map('normalize_line', file(__FILE__));
 
 $in = new pq\COPY($c, "copy_test (line)", pq\COPY::FROM_STDIN, "DELIMITER '\t'");
 
@@ -37,7 +42,7 @@ var_dump(
 );
 
 while ($out->get($line)) {
-	$lines[] = stripcslashes($line);
+	$lines[] = normalize_line(stripcslashes($line));
 }
 
 var_dump($file == $lines);
