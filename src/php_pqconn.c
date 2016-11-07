@@ -18,7 +18,12 @@
 #include <Zend/zend_smart_str.h>
 
 #include <libpq-events.h>
-#include <fnmatch.h>
+
+#ifdef PHP_WIN32
+#	include <win32/fnmatch.h>
+#else
+#	include <fnmatch.h>
+#endif
 
 #include "php_pq.h"
 #include "php_pq_misc.h"

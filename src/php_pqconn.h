@@ -17,7 +17,11 @@
 #define PHP_PQCONN_ASYNC      0x01
 #define PHP_PQCONN_PERSISTENT 0x02
 
-#include <ext/raphf/php_raphf.h>
+#ifdef PHP_WIN32
+#	include <php_raphf.h>
+#else
+#	include <ext/raphf/php_raphf.h>
+#endif
 #include "php_pq_object.h"
 #include "php_pq_callback.h"
 #include "php_pq_object.h"
